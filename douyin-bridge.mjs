@@ -10,10 +10,16 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startWSServer } from './bridge-ws.mjs';
 import zlib from 'node:zlib';
+import os from 'node:os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOM_RE = /live\.douyin\.com\/(\d+)/;
 const CHROME_CANDIDATES = [
+  process.env.PRINTER_BROWSER,
+  ...['/Applications', path.join(os.homedir(), 'Applications')].flatMap(base =>
+    [['Google Chrome.app','Google Chrome'], ['Microsoft Edge.app','Microsoft Edge'], ['Chromium.app','Chromium']]
+      .map(([app, exe]) => path.join(base, app, 'Contents', 'MacOS', exe))),
+  '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser',
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
@@ -453,13 +459,13 @@ async function findTarget(room) {
 }
 
 async function launchStandaloneChrome(room) {
-  const exe = CHROME_CANDIDATES.find(p => fs.existsSync(p));
+  const exe = CHROME_CANDIDATES.find(p => p && fs.existsSync(p));
   if (!exe) throw new Error('没有可用的 CDP 浏览器，也未找到 Chrome/Edge 可执行文件');
   const dir = path.join(__dirname, '.bridge-profile');
   fs.mkdirSync(dir, { recursive: true });
   console.log('[' + stamp() + '] 弹出直播间窗口(:9223)…可在里面登录抖音，登录后头像抓取更全');
   spawn(exe, [
-    '--remote-debugging-port=9223', '--user-data-dir=' + dir,
+    '--remote-debugging-port=9223', '--remote-debugging-address=127.0.0.1', '--user-data-dir=' + dir,
     '--no-first-run', '--no-default-browser-check', '--lang=zh-CN',
     '--window-position=120,90', '--window-size=1180,800',
     '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',

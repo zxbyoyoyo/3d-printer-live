@@ -15,7 +15,7 @@ export function renderPrintSettings(body,settings,save){
  for(const [key,title] of [['comment','评论打印'],['join','进场打印'],['like','点赞打印'],['follow','关注打印']]){const card=document.createElement('div');card.className='print-setting-card';trigger.append(card);toggle(card,key,title);select(card,key+'Count','每次张数',counts);select(card,key+'Size','头像大小',sizes)}
  const gifts=section('礼物打印');toggle(gifts,'gift','礼物触发打印');toggle(gifts,'giftPriority','礼物优先插队','立即切换到礼物；未完成的普通任务保留后重打，礼物之间按顺序处理');select(gifts,'giftSize','头像大小',sizes);
  for(const [key,title] of [['heart','爱心'],['beer','啤酒'],['lollipop','棒棒糖'],['other','其他礼物']])select(gifts,key+'Count',title+' / 每个',counts);
- const voice=section('语音播报');toggle(voice,'giftVoice','礼物答谢');toggle(voice,'joinVoice','进场欢迎');
+ const voice=section('语音播报');toggle(voice,'giftVoice','礼物答谢');toggle(voice,'joinVoice','进场欢迎');toggle(voice,'followVoice','关注感谢');
  const idle=section('空闲补位');toggle(idle,'idleFill','无互动时补测试头像');select(idle,'idleSeconds','等待时间',[15,30,60,120].map(n=>[n,n+' 秒']));
  const demo=section('自动演示');select(demo,'demoGapMs','自动演示补位间隔',[[0,'关闭'],[3000,'3 秒'],[5000,'5 秒'],[10000,'10 秒'],[15000,'15 秒'],[30000,'30 秒'],[60000,'60 秒'],[120000,'120 秒']]);
  const note=document.createElement('p');note.className='print-setting-note';note.textContent='自动保存 · 打印规则对新收到的互动生效，已排队任务保持不变。';body.append(note);

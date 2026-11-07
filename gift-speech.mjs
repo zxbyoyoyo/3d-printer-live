@@ -2,9 +2,61 @@ export class GiftSpeech {
  constructor(onStatus=()=>{}){this.enabled=true;this.volume=.85;this.rate=1.08;this.voiceURI='';this.onStatus=onStatus;this.unlocked=false;this.previous=-1;this.queue=[];this.speaking=false;this.generation=0}
  voices(){return globalThis.speechSynthesis?.getVoices()||[]}
  preferred(){const voices=this.voices();return voices.find(v=>v.voiceURI===this.voiceURI)||voices.find(v=>/zh|cmn/i.test(v.lang)&&/xiaoxiao|xiaoyi|huihui|yaoyao|female|女/i.test(v.name))||voices.find(v=>/zh-CN/i.test(v.lang))||voices.find(v=>/^zh/i.test(v.lang))}
- text(name,gift,amount){const safe=String(name).replace(/[<>\n\r]/g,'').slice(0,24);const phrases=[`谢谢${safe}送来的${amount}个${gift}，祝你今天开心，明天也有好消息！`,`感谢${safe}的${amount}个${gift}，愿你想做的事情，都慢慢变成现实。`,`${safe}，你的${amount}个${gift}收到啦！祝你吃得香，睡得好，每天都有小惊喜。`,`谢谢${safe}送的${amount}个${gift}呀，祝你好运常在，烦恼拜拜！`,`感谢${safe}送来${amount}个${gift}，愿你一路有风景，身边有温暖。`,`${safe}送来的${amount}个${gift}好暖心，谢谢你！祝你钱包鼓鼓，快乐满满。`,`收到${safe}的${amount}个${gift}啦，愿你所有认真，都有美好的回应。`,`谢谢${safe}的${amount}个${gift}，祝你今天顺顺利利，往后闪闪发光！`,`哇，${safe}的${amount}个${gift}到货啦！祝你笑口常开，好运挡不住。`,`${safe}送的${amount}个${gift}我收下啦，祝你天天有盼头，事事有着落。`,`谢谢${safe}的${amount}个${gift}，愿你被生活温柔对待，被好运常常想起。`,`${safe}的${amount}个${gift}超给力！祝你接下来的日子一路绿灯。`,`感谢${safe}送来${amount}个${gift}，祝你吃好喝好，心情天天晴朗。`,`${safe}的${amount}个${gift}收到！愿你今晚有好梦，明天有好天气。`,`谢谢${safe}的${amount}个${gift}呀，祝你烦恼清零，快乐续满格！`,`${safe}送来${amount}个${gift}，愿你的每一天都像今天一样被惊喜填满。`];let n=Math.floor(Math.random()*phrases.length);if(n===this.previous)n=(n+1)%phrases.length;this.previous=n;return phrases[n]}
- printing(name,finished=false){if(!this.unlocked||!this.enabled)return;const safe=String(name).replace(/[<>\n\r]/g,'').slice(0,24);const options=finished?[`${safe}，头像打印好啦！`,`${safe}，快看你的专属头像！`,`${safe}，制作完成，祝你好运！`,`${safe}，你的专属头像出炉啦，快来验收！`,`${safe}，打印完成，愿这份好运天天陪着你！`,`${safe}，成品新鲜出炉，快看看满不满意！`]:[`${safe}，开始打印啦！`,`${safe}，轮到你啦，祝你开心！`,`${safe}，头像安排上啦！`,`${safe}，机器转起来，你的头像马上好！`,`${safe}，正在为你定制专属头像哦！`,`${safe}，轮到你的头像啦，愿你好运连连！`];const text=options[Math.floor(Math.random()*options.length)];if(this.speaking||this.queue.length)return;this.enqueue(text)}
- welcome(name){this.unlocked=true;const safe=String(name).replace(/[<>\n\r]/g,'').slice(0,24);const lines=[`欢迎${safe}来到直播间，祝你今天好运满满，开心加倍！`,`欢迎${safe}，很高兴见到你呀，愿你接下来遇到的都是好事情。`,`${safe}来啦，欢迎欢迎！祝你生活有甜头，日子有盼头。`,`欢迎${safe}进来坐坐，愿你烦恼少一点，快乐多一点。`,`欢迎${safe}来到这里，祝你今天顺心，今晚睡个好觉！`,`${safe}，欢迎你呀！愿你所遇皆温暖，所行皆坦途。`,`欢迎${safe}，送你一份好心情，祝你吃嘛嘛香，做什么都顺顺利利。`,`欢迎${safe}来到直播间，愿你心里有光，每天都有小惊喜！`,`欢迎${safe}！今天人齐聚齐的，就等你来一起开心啦。`,`${safe}来啦！愿你今天的好心情像打印机的灯一样亮。`,`欢迎${safe}进直播间，愿你所求皆如愿，所行化坦途。`,`${safe}你好呀，愿你从今天起好运连连，笑容不断。`,`欢迎${safe}！搬好小板凳，精彩马上开始。`,`${safe}来啦，愿你的生活像新打印的头像一样，又亮又体面。`,`欢迎${safe}！祝你点的每一餐都好吃，走的每一步都顺。`,`${safe}来啦！愿你被这个世界温柔以待，天天都有小欢喜。`];let n=Math.floor(Math.random()*lines.length);if(n===this.lastWelcome)n=(n+1)%lines.length;this.lastWelcome=n;this.enqueue(lines[n])}
+ text(name,gift,amount=1){
+  const safe=this.safeName(name);
+  const label=(amount>1?amount+'个':'')+String(gift).replace(/[<>\n\r]/g,'').slice(0,30);
+  return this.choose('previous',[
+   `感谢${safe}送出的${label}！`,
+   `谢谢${safe}的${label}，爱你哦！`,
+   `${safe}，${label}收到啦，谢谢！`,
+   `谢谢${safe}支持，${label}收到啦！`,
+   `感谢${safe}的${label}，太感谢啦！`,
+   `${safe}送来${label}，爱你哦！`,
+   `谢谢${safe}送的${label}，比心！`,
+   `${safe}，谢谢你的${label}呀！`,
+   `收到${safe}的${label}，开心！`,
+   `感谢${safe}支持，${label}收下啦！`,
+   `${safe}的${label}收到，谢谢啦！`,
+   `哇，谢谢${safe}的${label}！`
+  ]);
+ }
+ safeName(name){return String(name).replace(/[<>\n\r]/g,'').slice(0,24)}
+ choose(key,lines){
+  let n=Math.floor(Math.random()*lines.length);
+  if(n===this[key])n=(n+1)%lines.length;
+  this[key]=n;
+  return lines[n];
+ }
+ printing(name,finished=false){
+  if(!this.unlocked||!this.enabled||this.speaking||this.queue.length)return;
+  const safe=this.safeName(name);
+  const lines=finished?[`${safe}，头像打印好啦！`,`${safe}，快看你的头像！`,`${safe}，新鲜出炉啦！`,`${safe}，打印完成，喜欢吗？`]:[`${safe}，开始打印啦！`,`${safe}，轮到你啦！`,`${safe}，头像安排上啦！`,`${safe}，马上就好哦！`];
+  this.enqueue(this.choose(finished?'lastFinished':'lastPrinting',lines));
+ }
+ welcome(name){
+  this.unlocked=true;const safe=this.safeName(name);
+  this.enqueue(this.choose('lastWelcome',[
+   `欢迎${safe}，来啦！`,`${safe}来啦，欢迎欢迎！`,
+   `欢迎${safe}，进来坐坐呀！`,`${safe}，欢迎来到直播间！`,
+   `欢迎${safe}，今天也要开心哦！`,`${safe}来啦，很高兴见到你！`,
+   `欢迎${safe}，一起玩呀！`,`${safe}，欢迎你呀！`
+  ]));
+ }
+ follow(name){
+  this.unlocked=true;const safe=this.safeName(name);
+  this.enqueue(this.choose('lastFollow',[
+   `感谢${safe}关注了我，我也会回关你的哈！`,
+   `谢谢${safe}的关注，爱你哦！`,
+   `${safe}关注啦，谢谢支持！`,
+   `感谢${safe}点关注，太感谢啦！`,
+   `谢谢${safe}关注，比心！`,
+   `${safe}，关注收到啦，爱你哦！`,
+   `感谢${safe}关注，常来玩呀！`,
+   `谢谢${safe}关注，我也会回关你的哈！`,
+   `${safe}，谢谢你的关注呀！`,
+   `感谢${safe}的关注，开心！`
+  ]));
+ }
  enqueue(text){if(!this.enabled)return;if(!globalThis.speechSynthesis){this.onStatus('当前浏览器不支持语音播报');return}if(this.queue.length>=12){this.onStatus('播报队列已满，本次仅显示字幕：'+text);return}this.queue.push(text);this.pump()}
  say(name,gift,amount=1){this.unlocked=true;this.enqueue(this.text(name,gift,amount))}
  pump(){if(!this.enabled||this.speaking||!this.queue.length)return;const text=this.queue.shift(),u=new SpeechSynthesisUtterance(text),token=this.generation;const voice=this.preferred();if(voice)u.voice=voice;u.lang=voice?.lang||'zh-CN';u.rate=this.rate;u.pitch=1.16;u.volume=this.volume;this.speaking=true;this.onStatus(text);u.onend=()=>{if(token!==this.generation)return;this.speaking=false;this.pump()};u.onerror=e=>{if(token!==this.generation)return;this.speaking=false;this.onStatus('语音播放失败：'+e.error+'，请点击试听或更换语音');this.queue=[]};speechSynthesis.speak(u)}

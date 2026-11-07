@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>透明直播叠加素材</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent!important}body{font-family:"PingFang SC","Microsoft YaHei",sans-serif}#art{position:absolute;transform-origin:top left;color:#ffe327;font-weight:900;-webkit-text-stroke:1px #6c4906;text-shadow:0 3px 0 #694a0c,0 0 10px #0008}#rules{padding:16px 22px}.row{height:120px;display:flex;align-items:center;gap:20px;font-size:58px;white-space:nowrap;letter-spacing:-1px}.comment-row{font-size:49px}.row img{width:104px;height:104px;object-fit:contain}.heart-scene{text-align:center;padding-top:22px}.heart-icon{width:230px;height:230px;object-fit:contain;animation:heartbeat 2s ease-in-out infinite}.headline{font-size:60px;line-height:1.4}.subline{font-size:38px;line-height:1.5}.glove{width:190px;height:225px;object-fit:contain;animation:point 1.5s ease-in-out infinite;margin-top:14px}.pointer{width:100%;height:90%;object-fit:contain;animation:point 1.5s ease-in-out infinite}.empty{font-size:36px;padding:30px}.static *{animation:none!important}@keyframes point{0%,100%{transform:translateY(0)}45%,65%{transform:translateY(24px)}}@keyframes heartbeat{0%,100%{transform:scale(.94)}15%{transform:scale(1.06)}30%{transform:scale(.97)}45%{transform:scale(1.04)}60%{transform:scale(.94)}}
+</style></head><body><main id="art" aria-label="直播叠加"></main><script type="module">
+import {overlayRows,savedOverlaySettings} from './overlay-rules.mjs';
+const params=new URLSearchParams(location.search);const mode=params.get('mode')||'heart';
+const art=document.querySelector('#art');const [width,height]=mode==='rules'?[600,520]:mode==='pointer'?[360,480]:[480,660];
+Object.assign(art.style,{width:width+'px',height:height+'px'});
+if(params.get('static')==='1')art.classList.add('static');
+function fit(){const scale=Math.min(innerWidth/width,innerHeight/height);art.style.transform=`scale(${scale})`;art.style.left=(innerWidth-width*scale)/2+'px';art.style.top=(innerHeight-height*scale)/2+'px'}
+function render(){
+ const settings=savedOverlaySettings();art.replaceChildren();
+ if(mode==='rules'){
+  const group=document.createElement('div');group.id='rules';
+  for(const row of overlayRows(settings)){const el=document.createElement('div');el.className=row.icon?'row':'row comment-row';if(row.icon){const img=new Image();img.src=row.icon;img.alt='';el.append(img)}const label=document.createElement('span');label.textContent=row.text;el.append(label);group.append(el)}
+  if(!group.children.length){group.className='empty';group.textContent='当前未开启互动打印'}
+  art.append(group);
+ }else if(mode==='pointer'){
+  const img=new Image();img.className='pointer';img.src='assets/overlays/glove.png';img.alt='向下指引';art.append(img);
+ }else{
+  art.classList.add('heart-scene');
+  const heart=new Image();heart.className='heart-icon';heart.src='assets/overlays/heart.png';heart.alt='小心心';
+  const title=document.createElement('div');title.className='headline';title.textContent='送个小心心';
+  const sub=document.createElement('div');sub.className='subline';
+  sub.textContent=overlayRows(settings).find(r=>r.icon?.endsWith('/heart.png'))?.text||'谢谢你的支持';
+  const hand=new Image();hand.className='glove';hand.src='assets/overlays/glove.png';hand.alt='向下指引';art.append(heart,title,sub,hand);
+ }
+ fit();
+}
+window.addEventListener('resize',fit);window.addEventListener('storage',render);render();
+</script></body></html>

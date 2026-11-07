@@ -1,3 +1,15 @@
+# Mac 直播优化版
+
+基于 [rhfbgfgfdg999999/3d-printer-live](https://github.com/rhfbgfgfdg999999/3d-printer-live) 的 MIT 开源项目，保留原作者署名与 Windows 入口。
+
+- **Mac 启动：** 安装 Python 3、Node.js 22+ 与 Chrome 后，双击 `start-mac.command`。也可以运行 `zsh start-mac.command`。
+- **关注感谢：** 与关注打印独立开关；中文礼物、关注和进场播报采用简短随机文案，穿插「爱你哦」「太感谢啦」等口语表达。
+- **透明直播素材：** 运行后打开 `materials.html`，下载手势、小心心循环 GIF / WebP、透明 PNG 规则牌；也可复制 OBS 浏览器叠加地址。
+- **使用说明：** [Mac 安装、语音与直播素材教程](docs/MAC-使用说明.md)。真实直播接入需自行登录直播间验证。
+- **验证：** `node --test *.test.mjs`；`python3 -m unittest test_mac test_scene_relay -v`。
+
+---
+
 # 头像打印机
 
 > **本程序由 志哥AI 免费开源出品** —— **完全免费，不收取任何费用**，可自由下载、使用、修改与分享。

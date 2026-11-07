@@ -1,4 +1,4 @@
-"""Standalone WebView2 printer and isolated live-room login window."""
+"""Avatar printer: Chrome on macOS/Linux, WebView2 desktop on Windows."""
 import argparse
 import json
 import os
@@ -17,6 +17,52 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+SERVER_PORTS = (8080, 8081, 8181, 8088, 8090, 8095, 8282, 8388)
+
+
+def browser_candidates(platform=None):
+    platform = platform or sys.platform
+    if platform == 'darwin':
+        return [str(base / app / 'Contents/MacOS' / exe)
+                for base in (Path('/Applications'), Path.home() / 'Applications')
+                for app, exe in (('Google Chrome.app', 'Google Chrome'),
+                                 ('Microsoft Edge.app', 'Microsoft Edge'),
+                                 ('Chromium.app', 'Chromium'))]
+    if platform == 'win32':
+        return [str(Path(base) / app) for base in
+                (os.environ.get('PROGRAMFILES', r'C:\Program Files'),
+                 os.environ.get('PROGRAMFILES(X86)', r'C:\Program Files (x86)'),
+                 os.environ.get('LOCALAPPDATA', '')) if base
+                for app in ('Google/Chrome/Application/chrome.exe',
+                            'Microsoft/Edge/Application/msedge.exe')]
+    return [shutil.which(name) for name in ('google-chrome', 'chromium', 'chromium-browser') if shutil.which(name)]
+
+
+def find_browser():
+    override = os.environ.get('PRINTER_BROWSER')
+    if override and Path(override).is_file():
+        return override
+    return next((p for p in browser_candidates() if Path(p).is_file()), None)
+
+
+def process_options(platform=None):
+    return {'creationflags': 0x08000000} if (platform or sys.platform) == 'win32' else {}
+
+
+def open_browser(url, size=(1280, 720), debug=False):
+    exe = find_browser()
+    if not exe:
+        return False
+    args = [exe, '--app=' + url if sys.platform == 'win32' else '--new-window',
+            '--window-size=%d,%d' % size]
+    if debug:
+        args += ['--remote-debugging-port=9223', '--remote-debugging-address=127.0.0.1',
+                 '--user-data-dir=' + str(ROOT / '.bridge-profile'),
+                 '--no-first-run', '--no-default-browser-check', '--lang=zh-CN']
+    args += ['--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
+             '--disable-background-timer-throttling', url]
+    subprocess.Popen(args, **process_options())
+    return True
 
 def room_id(raw):
     match = re.fullmatch(r'(?:https?://live\.douyin\.com/)?(\d{5,25})(?:[/?#].*)?', str(raw).strip())
@@ -63,7 +109,7 @@ ACTIVE_PORT = 8080
 def ensure_server():
     global ACTIVE_PORT
     # 8080 被代理等程序占用时自动换备用端口（8081/8181/8088）。
-    for port in (8080, 8081, 8181, 8088, 8090, 8095, 8282, 8388):
+    for port in SERVER_PORTS:
         if not listening(port):
             ACTIVE_PORT = port
             break
@@ -74,7 +120,8 @@ def ensure_server():
                     return f'http://127.0.0.1:{port}/', None
         except Exception:
             pass
-    ACTIVE_PORT = 8081
+    else:
+        raise RuntimeError('没有空闲的本机端口，请关闭旧头像打印程序后重试')
     relay = SceneRelay()
     bridge_process = None
     class Handler(SimpleHTTPRequestHandler):
@@ -88,26 +135,12 @@ def ensure_server():
         # 叠加一个本地控制端点：让浏览器页面也能拉起“独立应用窗口”（无浏览器界面）。
         def _guard(self):
             # 只允许本机页面调用（防其它网站借用本地服务拉进程）。
-            if not str(self.headers.get('Host', '')).startswith('127.0.0.1:' + str(ACTIVE_PORT)):
+            if self.headers.get('Host', '') != '127.0.0.1:' + str(ACTIVE_PORT):
                 return False
             return self.headers.get('Sec-Fetch-Site', '') == 'same-origin'
 
         def _spawn_app(self, url, size=(1280, 720), extra=None):
-            exe = None
-            for c in (r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
-                      r'C:\Program Files\Microsoft\Edge\Application\msedge.exe',
-                      r'C:\Program Files\Google\Chrome\Application\chrome.exe',
-                      r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'):
-                if os.path.exists(c):
-                    exe = c
-                    break
-            if not exe:
-                return False
-            args = [exe, '--app=' + url, '--window-size=%d,%d' % size]
-            if extra:
-                args += extra
-            subprocess.Popen(args)
-            return True
+            return open_browser(url, size, debug=bool(extra))
 
         def do_POST(self):
             if self.path != '/__scene-message' or not self._guard():
@@ -146,13 +179,7 @@ def ensure_server():
                 if not re.fullmatch(r'\d{5,25}', room):
                     return self._json(400, '{"ok":false,"error":"bad room"}')
                 size = (720, 1280) if (q.get('portrait') or ['0'])[0] == '1' else (1280, 720)
-                extra = None
-                if (q.get('debug') or ['0'])[0] == '1':
-                    extra = ['--remote-debugging-port=9223', '--user-data-dir=' + str(ROOT / '.bridge-profile'),
-                             '--lang=zh-CN', '--no-first-run', '--no-default-browser-check',
-                             '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
-                             '--disable-background-timer-throttling',
-                             '--disable-features=IntensiveWakeUpThrottling,CalculateNativeWinOcclusion']
+                extra = (q.get('debug') or ['0'])[0] == '1'
                 if not self._spawn_app('https://live.douyin.com/' + room, size, extra):
                     return self._json(500, '{"ok":false,"error":"no browser found"}')
                 return self._json(200, '{"ok":true}')
@@ -173,14 +200,13 @@ def ensure_server():
                 node = shutil.which('node')
                 if not node:
                     return self._json(500, '{"ok":false,"error":"node not found"}')
-                log = open(ROOT / 'desktop-bridge.log', 'ab')
                 (ROOT / '.bridge-room').write_text(room, encoding='utf-8')
                 env = os.environ.copy()
                 if listening(9224):
                     env['PRINTER_CDP_PORT'] = '9224'
-                bridge_process = subprocess.Popen([node, str(ROOT / 'douyin-bridge.mjs'), room], cwd=str(ROOT),
-                                 env=env, stdout=log, stderr=log,
-                                 creationflags=subprocess.CREATE_NO_WINDOW)
+                with open(ROOT / 'desktop-bridge.log', 'ab') as log:
+                    bridge_process = subprocess.Popen([node, str(ROOT / 'douyin-bridge.mjs'), room], cwd=str(ROOT),
+                                     env=env, stdout=log, stderr=log, **process_options())
                 try:
                     return self._json(200, json.dumps(wait_bridge(bridge_process)))
                 except RuntimeError as exc:
@@ -202,20 +228,10 @@ def ensure_server():
                 sizes = {'landscape': (1280, 720), 'landscape-1080p': (1920, 1080),
                          'portrait': (720, 1280), 'portrait-1080p': (1080, 1920)}
                 w, h = sizes.get(orient, (1280, 720))
-                size = f'{w},{h}'
                 if not re.fullmatch(r'/[A-Za-z0-9_\-]+\.html\?scene=1', spath):
                     return self._json(400, '{"ok":false,"error":"bad path"}')
-                exe = None
-                for c in (r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
-                          r'C:\Program Files\Microsoft\Edge\Application\msedge.exe',
-                          r'C:\Program Files\Google\Chrome\Application\chrome.exe',
-                          r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'):
-                    if os.path.exists(c):
-                        exe = c
-                        break
-                if not exe:
+                if not open_browser('http://127.0.0.1:' + str(ACTIVE_PORT) + spath, (w, h)):
                     return self._json(500, '{"ok":false,"error":"no browser found"}')
-                subprocess.Popen([exe, '--app=http://127.0.0.1:' + str(ACTIVE_PORT) + spath, '--window-size=' + size])
                 return self._json(200, '{"ok":true}')
             # Ignore validators from versions cached before no-store was enabled.
             for header in ('If-Modified-Since', 'If-None-Match'):
@@ -234,7 +250,19 @@ def ensure_server():
         def log_message(self, *args):
             pass
 
-    server = ThreadingHTTPServer(('127.0.0.1', ACTIVE_PORT), Handler)
+    class PrinterServer(ThreadingHTTPServer):
+        def server_close(self):
+            nonlocal bridge_process
+            if bridge_process and bridge_process.poll() is None:
+                bridge_process.terminate()
+                try:
+                    bridge_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    bridge_process.kill()
+                    bridge_process.wait()
+            super().server_close()
+
+    server = PrinterServer(('127.0.0.1', ACTIVE_PORT), partial(Handler, directory=str(ROOT)))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return f'http://127.0.0.1:{ACTIVE_PORT}/', server
 
@@ -361,7 +389,7 @@ class DesktopApi:
             env['PRINTER_CDP_PORT'] = '9224'
             with open(ROOT / 'desktop-bridge.log', 'ab') as log:
                 self._bridge = subprocess.Popen([node, str(ROOT / 'douyin-bridge.mjs'), room], cwd=ROOT,
-                    env=env, stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
+                    env=env, stdout=log, stderr=log, **process_options())
             status = wait_bridge(self._bridge)
             return f'数据桥已启动，端口 {status["port"]}，正在连接直播评论。'
 
@@ -396,12 +424,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--live-room')
     parser.add_argument('--server-only', action='store_true')
+    parser.add_argument('--browser', action='store_true', help='Use Chrome instead of WebView2')
     parser.add_argument('--room')
     parser.add_argument('--capture', action='store_true')
     parser.add_argument('--scene-view', action='store_true')
     parser.add_argument('--scene-orient', default='landscape')
     args = parser.parse_args()
-    if args.scene_view:
+    if args.scene_view and sys.platform == 'win32' and not args.browser:
         import webview
         sizes = {'landscape': (1280, 720), 'landscape-1080p': (1920, 1080),
                  'portrait': (720, 1280), 'portrait-1080p': (1080, 1920)}
@@ -414,7 +443,7 @@ def main():
         webview.start(gui='edgechromium', private_mode=False,
             storage_path=str(ROOT / '.scene-webview-profile'))
         return
-    if args.live_room:
+    if args.live_room and sys.platform == 'win32' and not args.browser:
         import webview
         webview.settings['REMOTE_DEBUGGING_PORT'] = 9224
         room = room_id(args.live_room)
@@ -424,7 +453,14 @@ def main():
     url, server = ensure_server()
     api = DesktopApi()
     try:
-        if args.server_only:
+        if args.server_only or args.browser or sys.platform != 'win32':
+            if not args.server_only:
+                target = url + ('live-view.html' if args.scene_view else '')
+                if not open_browser(target):
+                    raise RuntimeError('未找到 Chrome / Edge，请安装 Google Chrome 或设置 PRINTER_BROWSER')
+            print('头像打印机服务：' + url, flush=True)
+            print('直播素材：' + url + 'materials.html', flush=True)
+            print('保持此终端窗口开启，按 Ctrl+C 停止服务和数据桥。', flush=True)
             threading.Event().wait()
         else:
             import webview

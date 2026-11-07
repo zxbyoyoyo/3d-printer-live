@@ -37,3 +37,7 @@ popup-test-result.json
 .cover-profile/
 .snd-profile/
 .err-check/
+
+# macOS metadata and local environments
+.DS_Store
+.venv/
