@@ -46,11 +46,12 @@ export class SceneOutput {
       this.renderer.setPixelRatio(1);this.renderer.setSize(width,height,false);
     }
   }
-  render(scene,camera) {
+  render(scene,camera,presentation) {
     const r=this.renderer;
     r.shadowMap.needsUpdate=true;
     r.setRenderTarget(this.target);
     try {r.render(scene,camera);} finally {r.setRenderTarget(null);}
     r.render(this.scene,this.camera);
+    presentation?.render(r);
   }
 }

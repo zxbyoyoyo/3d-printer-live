@@ -32,3 +32,14 @@ for(const file of ['index.html','index-en.html']){
   vm.createContext(env);vm.runInContext(source.slice(start,end)+';autoStartBridge();',env);assert.equal(calls,0);
  });
 }
+
+for(const file of ['index.html','index-en.html']){
+ test(`${file}: offline demo never connects to the running live bridge`,async()=>{
+  const source=fs.readFileSync(new URL(file,import.meta.url),'utf8');
+  const start=source.indexOf('async function connectBridge()');
+  const end=source.indexOf('connectBridge();requestAnimate()',start);
+  let requests=0;const env={DEMO_ONLY:true,fetch:()=>{requests++;throw new Error('unexpected live request')}};
+  vm.createContext(env);vm.runInContext(source.slice(start,end),env);
+  await env.connectBridge();assert.equal(requests,0);
+ });
+}
